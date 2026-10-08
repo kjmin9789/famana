@@ -17,7 +17,7 @@ if [ -f "$SWIFT_INCLUDE/module.modulemap" ] && [ -f "$SWIFT_INCLUDE/bridging.mod
 EOF
     FLAGS=(-vfsoverlay "$PWD/build/swift-overlay.yaml")
 fi
-xcrun swiftc ${FLAGS[@]+"${FLAGS[@]}"} Sources/main.swift -o "$APP/Contents/MacOS/Famana" -framework Cocoa -framework ApplicationServices
+xcrun swiftc ${FLAGS[@]+"${FLAGS[@]}"} Sources/*.swift -o "$APP/Contents/MacOS/Famana" -framework Cocoa -framework ApplicationServices -framework AVFoundation
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,11 +26,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>Famana</string>
 <key>CFBundleExecutable</key><string>Famana</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>1</string>
-<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>1.1</string>
 <key>LSUIElement</key><true/>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
-<key>NSAppleEventsUsageDescription</key><string>선택한 파일의 이름 앞에 접두어를 붙이기 위해 Finder의 선택 항목을 확인합니다.</string>
+<key>NSAppleEventsUsageDescription</key><string>Finder의 선택 파일과 QuickTime Player의 영상 재생 위치를 확인해 이름 변경 및 장면 이미지 저장에 사용합니다.</string>
 </dict></plist>
 PLIST
 codesign --force --sign - "$APP"

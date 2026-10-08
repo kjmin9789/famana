@@ -87,7 +87,7 @@ func renameWithoutOverwrite(_ source: URL, to target: URL) throws {
     guard result == 0 else {
         let code = errno
         throw RenameFailure(message: code == EEXIST
-            ? "같은 이름이 이미 있습니다. 다른 접두어를 입력해 주세요."
+            ? "같은 이름이 이미 있습니다. 기존 파일은 덮어쓰지 않았습니다."
             : "이름을 바꾸지 못했습니다: " + String(cString: strerror(code)))
     }
 }
@@ -212,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     var preview: NSTextField?
     var originalName = ""
     var selectionCount = 0
+    var savingFrame = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -242,7 +243,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     @objc func clicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
-            for (title, action) in [("사용 방법", #selector(help)), ("손쉬운 사용 권한", #selector(permissions)),
+            for (title, action) in [("캡처 저장 폴더 선택…", #selector(chooseCaptureFolder)),
+                                    ("사용 방법", #selector(help)), ("손쉬운 사용 권한", #selector(permissions)),
                                     ("받아쓰기 설정", #selector(dictationSettings)), ("종료", #selector(quit))] {
                 let entry = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
                 entry.target = self
@@ -282,6 +284,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         let key = event.getIntegerValueField(.keyboardEventKeycode)
         if swallowedKey == key {
             if type == .keyUp { swallowedKey = nil }
+            return nil
+        }
+        if type == .keyDown, enabled, !presenting,
+           isFrameShortcut(key: key, flags: event.flags,
+                           bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier),
+           quickTimeMovieFocused() {
+            swallowedKey = key
+            if !savingFrame {
+                savingFrame = true
+                DispatchQueue.main.async { self.captureFrame() }
+            }
             return nil
         }
         guard type == .keyDown, enabled, !presenting, key == 36 || key == 76,
@@ -390,7 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.keyboard")!)
     }
     @objc func help() {
-        show("Famana 사용 방법", "① 메뉴 막대의 F 아이콘을 클릭해 초록 점으로 전환\n② Finder에서 파일 한 개 또는 여러 개 선택 → Enter\n③ 입력창 포커스 시 자동 받아쓰기 → 결과 확인 → Enter\n\n키보드 입력도 가능합니다.\n예: 사진.jpg → 여행 사진.jpg\nEsc로 취소 · 다시 클릭하면 OFF\n\n받아쓰기는 시스템 설정 → 키보드에서 먼저 켜 주세요. 기본 Finder 이름 변경은 OFF에서 사용할 수 있습니다.")
+        show("Famana 사용 방법", "① 메뉴 막대의 F 아이콘을 클릭해 초록 점으로 전환\n② Finder에서 파일 한 개 또는 여러 개 선택 → Enter\n③ 입력창 포커스 시 자동 받아쓰기 → 결과 확인 → Enter\n\n영상 장면 저장: F 우클릭 → 캡처 저장 폴더 선택 → QuickTime에서 원하는 장면에 일시정지 → ⌘S\n원본 해상도 PNG로 저장하며, 첫 사용 시 QuickTime 제어를 허용해 주세요.\n편집한 영상은 먼저 Famana를 OFF로 바꾸고 QuickTime에서 저장하세요.\n\nEsc로 취소 · 다시 클릭하면 OFF\n받아쓰기는 시스템 설정 → 키보드에서 먼저 켜 주세요.")
     }
     @objc func quit() { NSApp.terminate(nil) }
 }
@@ -411,6 +424,11 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--export-icons
     }
 } else if CommandLine.arguments.contains("--self-test") {
     do { try selfCheck() } catch { fputs("FAIL: \(error.localizedDescription)\n", stderr); exit(1) }
+    Task {
+        do { try await frameCaptureCheck(); exit(0) }
+        catch { fputs("FAIL: \(error.localizedDescription)\n", stderr); exit(1) }
+    }
+    RunLoop.main.run()
 } else {
     let app = NSApplication.shared
     let delegate = AppDelegate()

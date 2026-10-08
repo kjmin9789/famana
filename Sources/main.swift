@@ -213,6 +213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     var originalName = ""
     var selectionCount = 0
     var savingFrame = false
+    var saveToast: NSPanel?
+    var saveToastDismissal: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)

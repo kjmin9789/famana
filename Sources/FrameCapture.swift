@@ -121,6 +121,54 @@ func saveFramePNG(_ data: Data, source: URL, folder: URL,
 }
 
 extension AppDelegate {
+    func showSaveToast() {
+        saveToastDismissal?.cancel()
+        saveToast?.orderOut(nil)
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) })
+            ?? NSScreen.main else { return }
+        let frame = NSRect(x: screen.visibleFrame.midX - 140, y: screen.visibleFrame.minY + 28,
+                           width: 280, height: 48)
+        let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.hidesOnDeactivate = false
+        panel.ignoresMouseEvents = true
+        let content = NSView(frame: NSRect(origin: .zero, size: frame.size))
+        content.wantsLayer = true
+        content.layer?.backgroundColor = NSColor(srgbRed: 17/255, green: 18/255, blue: 20/255, alpha: 1).cgColor
+        content.layer?.cornerRadius = 12
+        let check = NSTextField(labelWithString: "✓")
+        check.frame = NSRect(x: 20, y: 14, width: 20, height: 20)
+        check.alignment = .center
+        check.font = .boldSystemFont(ofSize: 14)
+        check.textColor = .white
+        check.wantsLayer = true
+        check.layer?.backgroundColor = NSColor(srgbRed: 1, green: 85/255, blue: 56/255, alpha: 1).cgColor
+        check.layer?.cornerRadius = 10
+        let message = NSTextField(labelWithString: "장면이 저장되었습니다")
+        message.frame = NSRect(x: 49, y: 14, width: 215, height: 20)
+        message.font = .boldSystemFont(ofSize: 14)
+        message.textColor = .white
+        content.addSubview(check)
+        content.addSubview(message)
+        panel.contentView = content
+        saveToast = panel
+        panel.orderFrontRegardless()
+        NSAccessibility.post(element: panel, notification: .announcementRequested,
+                             userInfo: [.announcement: message.stringValue,
+                                        .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+        let dismissal = DispatchWorkItem { [weak self, weak panel] in
+            panel?.orderOut(nil)
+            self?.saveToast = nil
+        }
+        saveToastDismissal = dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: dismissal)
+    }
+
     @objc func chooseCaptureFolder() {
         let wasPresenting = presenting
         presenting = true
@@ -173,6 +221,7 @@ extension AppDelegate {
                     let data = try await frame.png()
                     let target = try saveFramePNG(data, source: frame.source.url, folder: folder)
                     self.item.button?.toolTip = "저장 완료: \(target.lastPathComponent)"
+                    self.showSaveToast()
                     self.item.button?.title = "✓"
                     self.item.button?.image = nil
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
